@@ -6,78 +6,120 @@ import numpy as np
 from preprocessor import transform_text 
 
 # --- 1. Load the Model Components EFFICIENTLY using Streamlit Caching ---
-# Caching prevents the models from reloading every time the app updates, improving performance.
 @st.cache_data
 def load_assets():
     try:
-        # Load all three necessary model/vectorizer assets
         loaded_model = joblib.load('final_classifier.pkl')
         loaded_cv = joblib.load('final_count_vectorizer.pkl')
         loaded_k_selector = joblib.load('final_feature_selector.pkl')
         return loaded_model, loaded_cv, loaded_k_selector
     except FileNotFoundError as e:
-        st.error(f"Error: Required file not found. Ensure '{e.filename}' is uploaded.")
+        st.error(f"⚠️ Error: Required file not found. Ensure '{e.filename}' is uploaded.")
         return None, None, None
 
 loaded_model, loaded_cv, loaded_k_selector = load_assets()
 
-# --- 2. UI Setup (Replaces Flask/HTML Header and Styling) ---
-st.set_page_config(page_title="Secure Mail Scanner", layout="centered")
+# --- 2. UI Setup and Styling ---
 
-# Use st.markdown and unsafe_allow_html=True to replicate basic Tailwind styles
+st.set_page_config(
+    page_title="Inbox Protector", 
+    layout="centered",
+    initial_sidebar_state="collapsed", # Keep it neat
+    menu_items={'About': "A simple machine learning app for text classification."}
+)
+
+# Use columns for a better centered title layout
+col1, col2, col3 = st.columns([1, 4, 1])
+
+with col2:
+    st.markdown(
+        """
+        <style>
+        .title-text {
+            font-size: 3em;
+            font-weight: 900;
+            color: #4f46e5; /* Streamlit Indigo-700 equivalent */
+            text-align: center;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+    # The title with a custom style
+    st.markdown('<div class="title-text">@ Inbox Protector</div>', unsafe_allow_html=True)
+
 st.markdown(
     """
-    <style>
-    .main-header {
-        font-size: 3em;
-        font-weight: 800;
-        color: #4f46e5; /* Tailwind indigo-700 */
-        text-align: center;
-        margin-bottom: 0.5em;
-    }
-    </style>
+    <p style='text-align: center; font-size: 1.1em; color: #555;'>
+        Scan any suspected email or SMS text for malicious content. 🛡️
+    </p>
     """,
     unsafe_allow_html=True
 )
 
-st.markdown('<h1 class="main-header">📧 Inbox Protector</h1>', unsafe_allow_html=True)
-st.markdown("Check any suspected email or message for spam.")
 st.markdown("---") 
 
-# --- 3. Input Form (Replaces HTML <form> and <textarea>) ---
+# --- 3. Input Form ---
+st.subheader("✍️ Enter Message:")
 raw_message = st.text_area(
-    "Enter Message:",
-    placeholder="Example: 'You have won a free iPhone! Click this survey link to claim your prize.'",
-    height=200
+    "Paste the full message content below.",
+    placeholder="Example: 'Congratulations! You've been selected for a prize. Click this link: ...'",
+    height=200,
+    label_visibility="collapsed" # Hide the label for cleaner look
 )
 
-# --- 4. Prediction Logic (Replaces the Flask @app.route('/predict') function) ---
-if st.button('Run Security Scan'):
+# --- 4. Prediction Logic and Enhanced Output ---
+st.markdown("<br>", unsafe_allow_html=True) # Add some space
+
+# Center the button
+col_a, col_b, col_c = st.columns([1, 2, 1])
+with col_b:
+    scan_button = st.button('🚀 Run Security Scan', use_container_width=True)
+
+if scan_button:
     if not loaded_model:
-        # This handles the case if a model failed to load in load_assets()
-        st.error("Cannot proceed: Model assets failed to load.")
+        st.error("❌ Cannot run scan: Model assets failed to load.")
     elif not raw_message:
-        st.warning("Please enter a message to scan.")
+        st.warning("⚠️ Please paste a message to begin the scan.")
     else:
-        # Create a spinner to show activity while processing (replaces animation)
-        with st.spinner('Analyzing message...'):
-            # 1. Clean the text
+        # Create a spinner to show activity while processing
+        with st.spinner('🔍 Analyzing message content...'):
+            # --- Prediction Pipeline ---
             cleaned_text = transform_text(raw_message)
-
-            # 2. Vectorize the text
-            # Ensure input is a list for the transformer
             vectorized_text = loaded_cv.transform([cleaned_text])
-
-            # 3. Select the features
             final_features = loaded_k_selector.transform(vectorized_text)
-
-            # 4. Predict
             prediction = loaded_model.predict(final_features)[0]
 
-        # 5. Format and Display the result (Replaces Jinja conditional rendering)
-        st.markdown("## Scan Results:")
+        # --- Enhanced Result Display ---
+        st.markdown("<br>### Scan Results:", unsafe_allow_html=True)
         
+        # Use columns for a clear, centered result box
+        res_col1, res_col2 = st.columns([1, 3])
+
         if prediction == 1:
-            st.error("🚫 **DANGER! SPAM Message Detected!**")
+            # SPAM Result
+            with res_col1:
+                st.image("https://em-content.zobj.net/source/apple/354/police-car-light_1f6a8.png", width=100)
+            with res_col2:
+                st.error("🚨 **VERDICT: SPAM DETECTED!**")
+                st.markdown("---")
+                st.markdown("This message exhibits high confidence for **phishing or spam**. **DO NOT** click any links or reply.")
+                st.balloons() # Fun animation for a negative result (ironic)
+
         else:
-            st.success("✅ **CLEAN! Legitimate Message (NOT SPAM)**")
+            # LEGIT Result
+            with res_col1:
+                st.image("https://em-content.zobj.net/source/apple/354/shield_1f6e1-fe0f.png", width=100)
+            with res_col2:
+                st.success("✅ **VERDICT: CLEAN MESSAGE**")
+                st.markdown("---")
+                st.markdown("This message appears **legitimate**. Proceed with caution, but it is unlikely to be spam.")
+                st.snow() # Fun animation for a positive result
+
+st.sidebar.markdown(
+    """
+    ## About this App
+    This tool utilizes a trained **Machine Learning Classifier** to analyze text features and predict if a message is spam (1) or not spam (0).
+    It is provided for informational purposes only.
+    """
+)
