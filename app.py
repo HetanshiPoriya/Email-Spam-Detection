@@ -1,13 +1,15 @@
 # app.py
 import streamlit as st
+import nltk 
 import joblib
 import pandas as pd
 import numpy as np
-import nltk
+
 from preprocessor import transform_text 
 
 # --- A. NLTK Resource Download Block (FIXES LookupError) ---
-@st.cache_data(show_spinner="Preparing environment...")
+# Using cache_resource for global resources like NLTK data
+@st.cache_resource(show_spinner="Preparing environment...")
 def download_nltk_data():
     """Checks for and downloads required NLTK resources like 'punkt' and 'stopwords'."""
     resources = ['punkt', 'stopwords'] # Add 'wordnet' or others if used in preprocessor.py
@@ -15,11 +17,8 @@ def download_nltk_data():
         try:
             # Try to find the resource first
             nltk.data.find(f'tokenizers/{resource}')
-        except nltk.downloader.DownloadError:
-            # If not found, download it
-            nltk.download(resource, quiet=True)
-        except LookupError:
-             # Handle cases where the resource isn't found in expected paths
+        except (nltk.downloader.DownloadError, LookupError):
+             # If not found or lookup fails, download it
              nltk.download(resource, quiet=True)
     
 download_nltk_data()
@@ -31,6 +30,7 @@ download_nltk_data()
 def load_assets():
     """Loads all model components (Classifier, Vectorizer, Selector)."""
     try:
+        # Load all three necessary model/vectorizer assets
         loaded_model = joblib.load('final_classifier.pkl')
         loaded_cv = joblib.load('final_count_vectorizer.pkl')
         loaded_k_selector = joblib.load('final_feature_selector.pkl')
@@ -106,4 +106,38 @@ if scan_button:
             # --- Prediction Pipeline ---
             cleaned_text = transform_text(raw_message)
             vectorized_text = loaded_cv.transform([cleaned_text])
-            final_features = loaded_k_selector.transform(vectorized_)
+            final_features = loaded_k_selector.transform(vectorized_text)
+            prediction = loaded_model.predict(final_features)[0]
+
+        # --- Enhanced Result Display ---
+        st.markdown("<br>### Scan Results:", unsafe_allow_html=True)
+        
+        res_col1, res_col2 = st.columns([1, 3])
+
+        if prediction == 1:
+            # SPAM Result
+            with res_col1:
+                st.markdown('<div style="font-size: 60px; text-align: center;">🚨</div>', unsafe_allow_html=True)
+            with res_col2:
+                st.error("🚨 **VERDICT: SPAM DETECTED!**")
+                st.markdown("---")
+                st.markdown("This message exhibits high confidence for **phishing or spam**. **DO NOT** click any links or reply.")
+                st.balloons()
+
+        else:
+            # LEGIT Result
+            with res_col1:
+                st.markdown('<div style="font-size: 60px; text-align: center;">🛡️</div>', unsafe_allow_html=True)
+            with res_col2:
+                st.success("✅ **VERDICT: CLEAN MESSAGE**")
+                st.markdown("---")
+                st.markdown("This message appears **legitimate**. Proceed with caution, but it is unlikely to be spam.")
+                st.snow()
+
+st.sidebar.markdown(
+    """
+    ## About this App
+    This tool utilizes a trained **Machine Learning Classifier** to analyze text features and predict if a message is spam (1) or not spam (0).
+    It is provided for informational purposes only.
+    """
+)
