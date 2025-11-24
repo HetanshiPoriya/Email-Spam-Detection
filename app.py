@@ -4,28 +4,26 @@ import nltk
 import joblib
 import pandas as pd
 import numpy as np
-
 from preprocessor import transform_text 
 
-# --- A. NLTK Resource Download Block (FIXES LookupError) ---
-# Using cache_resource for global resources like NLTK data
-@st.cache_resource(show_spinner="Preparing environment...")
+# --- A. NLTK Resource Download Block (FIXES LookupError and Attribute Error) ---
+# This function must run outside of Streamlit's caching to avoid deployment conflicts.
 def download_nltk_data():
     """Checks for and downloads required NLTK resources like 'punkt' and 'stopwords'."""
-    resources = ['punkt', 'stopwords'] # Add 'wordnet' or others if used in preprocessor.py
+    resources = ['punkt', 'stopwords'] 
     for resource in resources:
         try:
             # Try to find the resource first
             nltk.data.find(f'tokenizers/{resource}')
         except (nltk.downloader.DownloadError, LookupError):
-             # If not found or lookup fails, download it
+             # If not found or lookup fails, download it quietly
              nltk.download(resource, quiet=True)
     
-download_nltk_data()
+download_nltk_data() 
 # -----------------------------------------------------------------
 
 
-# --- B. Model Loading ---
+# --- B. Model Loading (Uses Streamlit's cache_data for efficiency) ---
 @st.cache_data
 def load_assets():
     """Loads all model components (Classifier, Vectorizer, Selector)."""
