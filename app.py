@@ -3,11 +3,33 @@ import streamlit as st
 import joblib
 import pandas as pd
 import numpy as np
+import nltk
 from preprocessor import transform_text 
 
-# --- 1. Load the Model Components EFFICIENTLY using Streamlit Caching ---
+# --- A. NLTK Resource Download Block (FIXES LookupError) ---
+@st.cache_data(show_spinner="Preparing environment...")
+def download_nltk_data():
+    """Checks for and downloads required NLTK resources like 'punkt' and 'stopwords'."""
+    resources = ['punkt', 'stopwords'] # Add 'wordnet' or others if used in preprocessor.py
+    for resource in resources:
+        try:
+            # Try to find the resource first
+            nltk.data.find(f'tokenizers/{resource}')
+        except nltk.downloader.DownloadError:
+            # If not found, download it
+            nltk.download(resource, quiet=True)
+        except LookupError:
+             # Handle cases where the resource isn't found in expected paths
+             nltk.download(resource, quiet=True)
+    
+download_nltk_data()
+# -----------------------------------------------------------------
+
+
+# --- B. Model Loading ---
 @st.cache_data
 def load_assets():
+    """Loads all model components (Classifier, Vectorizer, Selector)."""
     try:
         loaded_model = joblib.load('final_classifier.pkl')
         loaded_cv = joblib.load('final_count_vectorizer.pkl')
@@ -19,16 +41,16 @@ def load_assets():
 
 loaded_model, loaded_cv, loaded_k_selector = load_assets()
 
-# --- 2. UI Setup and Styling ---
+
+# --- C. UI Setup and Styling ---
 
 st.set_page_config(
     page_title="Inbox Protector", 
     layout="centered",
-    initial_sidebar_state="collapsed", # Keep it neat
+    initial_sidebar_state="collapsed",
     menu_items={'About': "A simple machine learning app for text classification."}
 )
 
-# Use columns for a better centered title layout
 col1, col2, col3 = st.columns([1, 4, 1])
 
 with col2:
@@ -38,14 +60,13 @@ with col2:
         .title-text {
             font-size: 3em;
             font-weight: 900;
-            color: #4f46e5; /* Streamlit Indigo-700 equivalent */
+            color: #4f46e5;
             text-align: center;
         }
         </style>
         """,
         unsafe_allow_html=True
     )
-    # The title with a custom style
     st.markdown('<div class="title-text">@ Inbox Protector</div>', unsafe_allow_html=True)
 
 st.markdown(
@@ -59,19 +80,18 @@ st.markdown(
 
 st.markdown("---") 
 
-# --- 3. Input Form ---
+# --- D. Input Form ---
 st.subheader("✍️ Enter Message:")
 raw_message = st.text_area(
     "Paste the full message content below.",
     placeholder="Example: 'Congratulations! You've been selected for a prize. Click this link: ...'",
     height=200,
-    label_visibility="collapsed" # Hide the label for cleaner look
+    label_visibility="collapsed"
 )
 
-# --- 4. Prediction Logic and Enhanced Output ---
-st.markdown("<br>", unsafe_allow_html=True) # Add some space
+# --- E. Prediction Logic and Enhanced Output ---
+st.markdown("<br>", unsafe_allow_html=True) 
 
-# Center the button
 col_a, col_b, col_c = st.columns([1, 2, 1])
 with col_b:
     scan_button = st.button('🚀 Run Security Scan', use_container_width=True)
@@ -82,44 +102,8 @@ if scan_button:
     elif not raw_message:
         st.warning("⚠️ Please paste a message to begin the scan.")
     else:
-        # Create a spinner to show activity while processing
         with st.spinner('🔍 Analyzing message content...'):
             # --- Prediction Pipeline ---
             cleaned_text = transform_text(raw_message)
             vectorized_text = loaded_cv.transform([cleaned_text])
-            final_features = loaded_k_selector.transform(vectorized_text)
-            prediction = loaded_model.predict(final_features)[0]
-
-        # --- Enhanced Result Display ---
-        st.markdown("<br>### Scan Results:", unsafe_allow_html=True)
-        
-        # Use columns for a clear, centered result box
-        res_col1, res_col2 = st.columns([1, 3])
-
-        if prediction == 1:
-            # SPAM Result
-            with res_col1:
-                st.image("https://em-content.zobj.net/source/apple/354/police-car-light_1f6a8.png", width=100)
-            with res_col2:
-                st.error("🚨 **VERDICT: SPAM DETECTED!**")
-                st.markdown("---")
-                st.markdown("This message exhibits high confidence for **phishing or spam**. **DO NOT** click any links or reply.")
-                st.balloons() # Fun animation for a negative result (ironic)
-
-        else:
-            # LEGIT Result
-            with res_col1:
-                st.image("https://em-content.zobj.net/source/apple/354/shield_1f6e1-fe0f.png", width=100)
-            with res_col2:
-                st.success("✅ **VERDICT: CLEAN MESSAGE**")
-                st.markdown("---")
-                st.markdown("This message appears **legitimate**. Proceed with caution, but it is unlikely to be spam.")
-                st.snow() # Fun animation for a positive result
-
-st.sidebar.markdown(
-    """
-    ## About this App
-    This tool utilizes a trained **Machine Learning Classifier** to analyze text features and predict if a message is spam (1) or not spam (0).
-    It is provided for informational purposes only.
-    """
-)
+            final_features = loaded_k_selector.transform(vectorized_)
