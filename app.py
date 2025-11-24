@@ -47,6 +47,3 @@ def predict():
     # Return the result to the HTML template
     return render_template('index.html', prediction_text=result)
 
-if __name__ == "__main__":
-    # Run the application on your local machine
-    app.run(debug=True)
